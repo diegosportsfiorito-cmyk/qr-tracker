@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Redirigiendo...</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+        .message { text-align: center; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <div class="spinner"></div>
+        <p>Verificando enlace, por favor espere...</p>
+    </div>
+
+    <script>
+        // ------- CONFIGURACIÓN DE FIREBASE (LO CAMBIARÁS LUEGO) -------
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY_AQUI",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO_ID",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "TU_ID",
+            appId: "TU_APP_ID"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // ------- CONFIGURACIÓN DE TUS QR -------
+        // Aquí pones el ID del QR y a qué URL va a redirigir
+        const destinos = {
+            "promo1": "https://google.com",
+            "promo2": "https://youtube.com"
+        };
+
+        // ------- LÓGICA DE SEGUIMIENTO -------
+        const urlParams = new URLSearchParams(window.location.search);
+        const qrId = urlParams.get('id') || 'desconocido';
+        const urlFinal = destinos[qrId] || "https://google.com"; // URL por defecto si el ID no existe
+
+        let lat = null;
+        let lon = null;
+
+        // Intentar pedir ubicación
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    lat = position.coords.latitude;
+                    lon = position.coords.longitude;
+                    guardarYRedirigir();
+                },
+                (error) => {
+                    guardarYRedirigir(); // Si rechaza ubicación, guarda sin ella
+                },
+                { timeout: 4000 }
+            );
+        } else {
+            guardarYRedirigir();
+        }
+
+        function guardarYRedirigir() {
+            db.collection('scans').add({
+                qrId: qrId,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                userAgent: navigator.userAgent,
+                lat: lat,
+                lon: lon
+            }).then(() => {
+                window.location.href = urlFinal; // ¡Redirige al usuario!
+            }).catch((error) => {
+                window.location.href = urlFinal; // Si falla la base de datos, igual redirige
+            });
+        }
+    </script>
+</body>
+</html>

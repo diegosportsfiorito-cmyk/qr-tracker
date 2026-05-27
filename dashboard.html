@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - QR Tracker</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .stats { display: flex; justify-content: space-around; margin-bottom: 30px; }
+        .stat-box { background: #3498db; color: white; padding: 20px; border-radius: 8px; text-align: center; width: 40%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-box h2 { margin: 0; font-size: 3em; }
+        .stat-box p { margin: 5px 0 0 0; font-size: 1.1em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #2c3e50; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        .btn-map { background: #27ae60; color: white; padding: 5px 10px; border-radius: 5px; text-decoration: none; font-size: 0.9em; }
+        .btn-map:hover { background: #2ecc71; }
+        .login { text-align: center; margin-top: 50px; }
+        .login input { padding: 10px; font-size: 1em; width: 200px; }
+        .login button { padding: 10px 20px; font-size: 1em; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA DE CONTRASEÑA -->
+    <div id="login-screen" class="login container">
+        <h2>Acceso Privado</h2>
+        <p>Ingresa la contraseña para ver las estadísticas</p>
+        <input type="password" id="password-input" placeholder="Contraseña">
+        <button onclick="checkPassword()">Entrar</button>
+    </div>
+
+    <!-- PANTALLA DEL DASHBOARD (Oculta al principio) -->
+    <div id="dashboard-screen" style="display: none;">
+        <div class="container">
+            <h1>📊 Dashboard de Escaneos</h1>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <h2 id="total-scans">0</h2>
+                    <p>Total de Escaneos</p>
+                </div>
+                <div class="stat-box" style="background: #e67e22;">
+                    <h2 id="total-with-location">0</h2>
+                    <p>Con Ubicación GPS</p>
+                </div>
+            </div>
+
+            <h3>Historial Reciente</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha / Hora</th>
+                        <th>Campaña (ID)</th>
+                        <th>Dispositivo</th>
+                        <th>Ubicación</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-datos">
+                    <!-- Aquí se insertarán las filas dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // ------- CONFIGURACIÓN DE FIREBASE -------
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWnsIrC7TwKib6z69y8dELBVEs0Zgov4I",
+            authDomain: "qr-tracker-d506d.firebaseapp.com",
+            projectId: "qr-tracker-d506d",
+            storageBucket: "qr-tracker-d506d.firebasestorage.app",
+            messagingSenderId: "718659152932",
+            appId: "1:718659152932:web:d3945cdc4a963c5f8e3cb1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // ------- SEGURIDAD BÁSICA -------
+        function checkPassword() {
+            const pass = document.getElementById('password-input').value;
+            if (pass === "admin123") { // <--- ESTA ES TU CONTRASEÑA, CÁMBIALA SI QUIERES
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard-screen').style.display = 'block';
+                loadData();
+            } else {
+                alert('Contraseña incorrecta');
+            }
+        }
+
+        // ------- CARGAR DATOS DE FIREBASE -------
+        async function loadData() {
+            const tabla = document.getElementById('tabla-datos');
+            const totalScansEl = document.getElementById('total-scans');
+            const totalLocEl = document.getElementById('total-with-location');
+            
+            let countTotal = 0;
+            let countLocation = 0;
+
+            try {
+                // Obtener todos los documentos de la colección 'scans'
+                const querySnapshot = await db.collection('scans').get();
+                
+                // Convertir a array para ordenar por fecha (más reciente primero)
+                let scans = [];
+                querySnapshot.forEach(doc => scans.push(doc.data()));
+                
+                scans.sort((a, b) => {
+                    const timeA = a.timestamp ? a.timestamp.seconds : 0;
+                    const timeB = b.timestamp ? b.timestamp.seconds : 0;
+                    return timeB - timeA;
+                });
+
+                // Llenar la tabla
+                scans.forEach(data => {
+                    countTotal++;
+                    
+                    // Formatear fecha
+                    let fechaStr = 'Sin fecha';
+                    if (data.timestamp) {
+                        fechaStr = new Date(data.timestamp.seconds * 1000).toLocaleString('es-AR');
+                    }
+
+                    // Detectar dispositivo
+                    let dispositivo = 'Otro';
+                    if (data.userAgent) {
+                        if (data.userAgent.includes('iPhone') || data.userAgent.includes('iPad')) dispositivo = 'iOS (Apple)';
+                        else if (data.userAgent.includes('Android')) dispositivo = 'Android';
+                        else if (data.userAgent.includes('Windows')) dispositivo = 'Windows PC';
+                        else if (data.userAgent.includes('Mac')) dispositivo = 'Mac PC';
+                    }
+
+                    // Ubicación
+                    let ubicacionHTML = 'No proporcionada';
+                    if (data.lat && data.lon) {
+                        countLocation++;
+                        ubicacionHTML = `<a class="btn-map" href="https://www.google.com/maps?q=${data.lat},${data.lon}" target="_blank">📍 Ver en Mapa</a>`;
+                    }
+
+                    // Agregar fila a la tabla
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${fechaStr}</td>
+                        <td><strong>${data.qrId || 'N/A'}</strong></td>
+                        <td>${dispositivo}</td>
+                        <td>${ubicacionHTML}</td>
+                    `;
+                    tabla.appendChild(tr);
+                });
+
+                // Actualizar contadores
+                totalScansEl.innerText = countTotal;
+                totalLocEl.innerText = countLocation;
+
+            } catch (error) {
+                console.error("Error al cargar los datos: ", error);
+                alert("Error al cargar los datos. Revisa la consola.");
+            }
+        }
+    </script>
+</body>
+</html>

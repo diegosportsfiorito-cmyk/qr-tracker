@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Redirigiendo...</title>
+    <!-- Cargar Firebase desde CDN -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
@@ -19,15 +20,17 @@
     </div>
 
     <script>
-        // ------- CONFIGURACIÓN DE FIREBASE (LO CAMBIARÁS LUEGO) -------
+        // ------- TU CONFIGURACIÓN DE FIREBASE -------
         const firebaseConfig = {
-            apiKey: "TU_API_KEY_AQUI",
-            authDomain: "TU_PROYECTO.firebaseapp.com",
-            projectId: "TU_PROYECTO_ID",
-            storageBucket: "TU_PROYECTO.appspot.com",
-            messagingSenderId: "TU_ID",
-            appId: "TU_APP_ID"
+            apiKey: "AIzaSyBWnsIrC7TwKib6z69y8dELBVEs0Zgov4I",
+            authDomain: "qr-tracker-d506d.firebaseapp.com",
+            projectId: "qr-tracker-d506d",
+            storageBucket: "qr-tracker-d506d.firebasestorage.app",
+            messagingSenderId: "718659152932",
+            appId: "1:718659152932:web:d3945cdc4a963c5f8e3cb1"
         };
+        
+        // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
@@ -73,6 +76,7 @@
             }).then(() => {
                 window.location.href = urlFinal; // ¡Redirige al usuario!
             }).catch((error) => {
+                console.error("Error al guardar: ", error);
                 window.location.href = urlFinal; // Si falla la base de datos, igual redirige
             });
         }

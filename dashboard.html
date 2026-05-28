@@ -9,15 +9,12 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Librería para el Mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h1, h2 { color: #333; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        
-        /* Stats y Top Bar */
         .stats { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat-box { background: #3498db; color: white; padding: 15px; border-radius: 8px; text-align: center; flex: 1; min-width: 120px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .stat-box.orange { background: #e67e22; }
@@ -31,8 +28,6 @@
         .btn-green { background: #2ecc71; } .btn-green:hover { background: #27ae60; }
         .btn-purple { background: #9b59b6; } .btn-purple:hover { background: #8e44ad; }
         .btn-red { background: #e74c3c; font-size: 0.8em; padding: 5px 10px; } .btn-red:hover { background: #c0392b; }
-
-        /* Sección Campañas y Mapa */
         .grid-section { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
         .card { flex: 1; min-width: 300px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
         .form-group { margin-bottom: 10px; }
@@ -40,20 +35,16 @@
         .form-group input { width: calc(100% - 20px); padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         #map { height: 300px; width: 100%; border-radius: 8px; z-index: 1; }
         .campaign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9f9f9; margin-bottom: 5px; border-radius: 5px; font-size: 0.9em; border-left: 4px solid #3498db; }
-
-        /* Tabla y Filtros */
         .filters { display: flex; gap: 15px; margin-bottom: 20px; padding: 15px; background: #fdfdfd; border: 1px solid #ddd; border-radius: 8px; flex-wrap: wrap; align-items: flex-end; }
         .filter-group label { font-weight: bold; font-size: 0.85em; color: #333; display: block; margin-bottom: 5px; }
         .filter-group select, .filter-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .filter-group { flex: 1; min-width: 130px; }
         .checkbox-group { display: flex; align-items: center; gap: 10px; padding-top: 5px; }
-        
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background-color: #2c3e50; color: white; }
         tr:hover { background-color: #f1f1f1; }
         .btn-map { background: #27ae60; color: white; padding: 4px 8px; border-radius: 5px; text-decoration: none; font-size: 0.85em; }
-
         .login { text-align: center; margin-top: 50px; }
         .login input { padding: 10px; font-size: 1em; width: 200px; }
         .login button { padding: 10px 20px; font-size: 1em; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 5px; }
@@ -81,12 +72,12 @@
             <div class="top-bar">
                 <p id="last-updated">⏱ Escuchando en tiempo real...</p>
                 <div>
-                    <button class="btn btn-purple" onclick="exportToCSV()">📥 Exportar CSV</button>
+                    <button class="btn btn-green" onclick="manualRefresh()">🔄 Actualizar</button>
+                    <button class="btn btn-purple" onclick="exportToCSV()">📥 CSV</button>
                 </div>
             </div>
 
             <div class="grid-section">
-                <!-- Gestión de Campañas -->
                 <div class="card">
                     <h2>➕ Nueva Campaña</h2>
                     <div class="form-group">
@@ -100,8 +91,6 @@
                     <button class="btn btn-blue" onclick="createCampaign()" style="width:100%">Generar QR / Guardar</button>
                     <div id="campaigns-list" style="margin-top: 15px;"></div>
                 </div>
-
-                <!-- Mapa -->
                 <div class="card">
                     <h2>🗺️ Mapa de Escaneos</h2>
                     <div id="map"></div>
@@ -159,7 +148,6 @@
         let mapInstance = null;
         let markersLayer = null;
 
-        // --- PWA Service Worker Registration ---
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/qr-tracker/sw.js').catch(err => console.log('SW Error', err));
         }
@@ -179,21 +167,42 @@
         }
 
         function initMap() {
-            mapInstance = L.map('map').setView([-34.6, -58.4], 4); // Vista mundial por defecto
+            mapInstance = L.map('map').setView([-34.6, -58.4], 4);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
             markersLayer = L.layerGroup().addTo(mapInstance);
         }
 
-        // --- TIEMPO REAL (onSnapshot) ---
+        // --- TIEMPO REAL ARREGLADO (Sin OrderBy para evitar errores de Índice) ---
         function listenToScans() {
-            db.collection('scans').orderBy('timestamp', 'desc').onSnapshot(snapshot => {
+            db.collection('scans').onSnapshot(snapshot => {
                 allScans = [];
                 snapshot.forEach(doc => allScans.push(doc.data()));
-                document.getElementById('last-updated').innerText = `⏱ Actualizado en tiempo real: ${new Date().toLocaleTimeString('es-AR')}`;
                 
+                // Ordenar en JavaScript en lugar de Firebase
+                allScans.sort((a, b) => {
+                    const timeA = a.timestamp ? a.timestamp.seconds : 0;
+                    const timeB = b.timestamp ? b.timestamp.seconds : 0;
+                    return timeB - timeA; // Descendente
+                });
+
+                document.getElementById('last-updated').innerText = `⏱ Tiempo real activo: ${new Date().toLocaleTimeString('es-AR')}`;
                 populateCampaignFilter();
                 applyLocalFilters();
-            }, error => console.error("Error en snapshot: ", error));
+            }, error => {
+                console.error("Error en tiempo real: ", error);
+                document.getElementById('last-updated').innerText = "⚠️ Error en tiempo real. Usa Actualizar.";
+            });
+        }
+
+        // Botón Manual por si falla el tiempo real
+        async function manualRefresh() {
+            const snapshot = await db.collection('scans').get();
+            allScans = [];
+            snapshot.forEach(doc => allScans.push(doc.data()));
+            allScans.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+            populateCampaignFilter();
+            applyLocalFilters();
+            document.getElementById('last-updated').innerText = `🔄 Actualizado manualmente: ${new Date().toLocaleTimeString('es-AR')}`;
         }
 
         function listenToCampaigns() {
@@ -211,17 +220,13 @@
             });
         }
 
-        // --- GESTIÓN DE CAMPAÑAS ---
         async function createCampaign() {
             const id = document.getElementById('new-camp-id').value.trim();
             const url = document.getElementById('new-camp-url').value.trim();
             if(!id || !url) return alert("Completa ambos campos");
-            
             await db.collection('campaigns').doc(id).set({ url: url });
-            
             const qrLink = `https://diegosportsfiorito-cmyk.github.io/qr-tracker/redirect.html?id=${id}`;
             prompt("✅ Campaña guardada! Copia este enlace para generar tu QR:", qrLink);
-            
             document.getElementById('new-camp-id').value = '';
             document.getElementById('new-camp-url').value = '';
         }
@@ -241,7 +246,6 @@
             select.value = currentVal;
         }
 
-        // --- FILTRADO Y RENDERIZADO ---
         function applyLocalFilters() {
             const campaign = document.getElementById('filter-campaign').value;
             const dateFrom = document.getElementById('filter-date-from').value;
@@ -258,7 +262,6 @@
                 if (gpsOnly && (!data.lat || !data.lon)) return false;
                 return true;
             });
-
             renderData(filtered);
         }
 
@@ -266,14 +269,11 @@
             const tabla = document.getElementById('tabla-datos');
             tabla.innerHTML = '';
             let countLoc = 0, accSum = 0, accCount = 0;
-
-            // Limpiar mapa
             markersLayer.clearLayers();
 
             data.forEach(data => {
                 let fechaStr = 'Sin fecha';
                 if (data.timestamp) fechaStr = new Date(data.timestamp.seconds * 1000).toLocaleString('es-AR');
-
                 let dispositivo = 'Otro';
                 if (data.userAgent) {
                     if (data.userAgent.includes('iPhone') || data.userAgent.includes('iPad')) dispositivo = 'iOS';
@@ -281,18 +281,14 @@
                     else if (data.userAgent.includes('Windows')) dispositivo = 'Win PC';
                     else if (data.userAgent.includes('Mac')) dispositivo = 'Mac PC';
                 }
-
                 let ubicacionHTML = 'No';
                 if (data.lat && data.lon) {
                     countLoc++;
                     if(data.accuracy) { accSum += data.accuracy; accCount++; }
                     ubicacionHTML = `<a class="btn-map" href="https://www.google.com/maps?q=${data.lat},${data.lon}" target="_blank">📍 Mapa (~${Math.round(data.accuracy || 0)}m)</a>`;
-                    
-                    // Agregar marcador al mapa
                     const marker = L.marker([data.lat, data.lon]).bindPopup(`<b>${data.qrId}</b><br>${fechaStr}<br>${dispositivo}`);
                     markersLayer.addLayer(marker);
                 }
-
                 tabla.innerHTML += `<tr><td>${fechaStr}</td><td><strong>${data.qrId || 'N/A'}</strong></td><td>${dispositivo}</td><td>${ubicacionHTML}</td></tr>`;
             });
 
@@ -300,7 +296,6 @@
             document.getElementById('total-with-location').innerText = countLoc;
             document.getElementById('avg-accuracy').innerText = accCount > 0 ? Math.round(accSum / accCount) : '--';
 
-            // Ajustar mapa a los marcadores
             if(markersLayer.getLayers().length > 0) {
                 mapInstance.fitBounds(markersLayer.getBounds().pad(0.2));
             }

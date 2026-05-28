@@ -39,19 +39,24 @@
         const urlParams = new URLSearchParams(window.location.search);
         const qrId = urlParams.get('id') || 'desconocido';
 
-        async function procesarEscaneo() {
-            let urlFinal = "https://google.com"; // URL por defecto si no encuentra la campaña
+        // RESPALDO: Si Firebase no encuentra la campaña, usa estas URLs
+        const destinosFijos = {
+            "promo1": "https://google.com",
+            "promo2": "https://youtube.com",
+            "whatsapp1": "https://wa.link/sr53o3"
+        };
 
-            // 1. Buscar la URL de destino en Firebase
+        async function procesarEscaneo() {
+            let urlFinal = destinosFijos[qrId] || "https://google.com"; // Por defecto al fijo
+
+            // 1. Intentar buscar en Firebase (Base de datos de campañas)
             try {
                 const doc = await db.collection('campaigns').doc(qrId).get();
                 if (doc.exists) {
-                    urlFinal = doc.data().url;
-                } else {
-                    console.log("Campaña no encontrada, yendo a Google");
+                    urlFinal = doc.data().url; // Si existe en Firebase, usa este
                 }
             } catch (e) {
-                console.error("Error al buscar campaña", e);
+                console.log("No se pudo leer Firebase, usando URL fija");
             }
 
             // 2. Pedir Ubicación GPS
@@ -69,7 +74,7 @@
                 }
             }
 
-            // 3. Guardar Estadística en Firebase
+            // 3. Guardar Estadística en Firebase (sea cual sea la URL)
             try {
                 await db.collection('scans').add({
                     qrId: qrId,
@@ -78,10 +83,10 @@
                     lat: lat,
                     lon: lon,
                     accuracy: accuracy,
-                    urlDestino: urlFinal // Guardamos a dónde fue
+                    urlDestino: urlFinal
                 });
             } catch (e) {
-                console.error("Error al guardar escaneo", e);
+                console.error("Error al guardar escaneo en Firebase", e);
             }
 
             // 4. Redirigir al usuario

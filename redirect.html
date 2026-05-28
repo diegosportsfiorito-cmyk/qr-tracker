@@ -36,53 +36,59 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        const destinos = {
-            "promo1": "https://google.com",
-            "promo2": "https://youtube.com",
-            "whatsapp1": "https://wa.link/sr53o3"
-        };
-
         const urlParams = new URLSearchParams(window.location.search);
         const qrId = urlParams.get('id') || 'desconocido';
-        const urlFinal = destinos[qrId] || "https://google.com";
 
-        let lat = null;
-        let lon = null;
-        let accuracy = null; // NUEVO: Para guardar la precisión en metros
+        async function procesarEscaneo() {
+            let urlFinal = "https://google.com"; // URL por defecto si no encuentra la campaña
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    lat = position.coords.latitude;
-                    lon = position.coords.longitude;
-                    accuracy = position.coords.accuracy; // NUEVO: Precisión del GPS
-                    guardarYRedirigir();
-                },
-                (error) => {
-                    guardarYRedirigir(); 
-                },
-                // NUEVO: Forzar alta precisión (GPS real en lugar de IP)
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } 
-            );
-        } else {
-            guardarYRedirigir();
+            // 1. Buscar la URL de destino en Firebase
+            try {
+                const doc = await db.collection('campaigns').doc(qrId).get();
+                if (doc.exists) {
+                    urlFinal = doc.data().url;
+                } else {
+                    console.log("Campaña no encontrada, yendo a Google");
+                }
+            } catch (e) {
+                console.error("Error al buscar campaña", e);
+            }
+
+            // 2. Pedir Ubicación GPS
+            let lat = null, lon = null, accuracy = null;
+            if (navigator.geolocation) {
+                try {
+                    const pos = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+                    });
+                    lat = pos.coords.latitude;
+                    lon = pos.coords.longitude;
+                    accuracy = pos.coords.accuracy;
+                } catch (err) {
+                    console.log("Ubicación denegada o fallida");
+                }
+            }
+
+            // 3. Guardar Estadística en Firebase
+            try {
+                await db.collection('scans').add({
+                    qrId: qrId,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userAgent: navigator.userAgent,
+                    lat: lat,
+                    lon: lon,
+                    accuracy: accuracy,
+                    urlDestino: urlFinal // Guardamos a dónde fue
+                });
+            } catch (e) {
+                console.error("Error al guardar escaneo", e);
+            }
+
+            // 4. Redirigir al usuario
+            window.location.href = urlFinal;
         }
 
-        function guardarYRedirigir() {
-            db.collection('scans').add({
-                qrId: qrId,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                userAgent: navigator.userAgent,
-                lat: lat,
-                lon: lon,
-                accuracy: accuracy // NUEVO: Guardamos la precisión
-            }).then(() => {
-                window.location.href = urlFinal;
-            }).catch((error) => {
-                console.error("Error al guardar: ", error);
-                window.location.href = urlFinal;
-            });
-        }
+        procesarEscaneo();
     </script>
 </body>
 </html>

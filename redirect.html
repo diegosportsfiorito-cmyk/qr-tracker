@@ -16,7 +16,7 @@
 <body>
     <div class="message">
         <div class="spinner"></div>
-        <p>Verificando enlace, por favor espere...</p>
+        <p id="status-message">Verificando enlace, por favor espere...</p>
         <div class="aviso-ubicacion">
             💡 <strong>¿Pronto te pediremos tu ubicación?</strong><br>
             Autorízala para acceder a promociones y beneficios exclusivos disponibles en tu zona. ¡Es rápido y seguro!
@@ -39,7 +39,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const qrId = urlParams.get('id') || 'desconocido';
 
-        // RESPALDO: Si Firebase no encuentra la campaña, usa estas URLs
         const destinosFijos = {
             "promo1": "https://google.com",
             "promo2": "https://youtube.com",
@@ -47,16 +46,16 @@
         };
 
         async function procesarEscaneo() {
-            let urlFinal = destinosFijos[qrId] || "https://google.com"; // Por defecto al fijo
+            let urlFinal = destinosFijos[qrId] || "https://google.com";
 
-            // 1. Intentar buscar en Firebase (Base de datos de campañas)
+            // 1. Intentar buscar en Firebase
             try {
                 const doc = await db.collection('campaigns').doc(qrId).get();
                 if (doc.exists) {
-                    urlFinal = doc.data().url; // Si existe en Firebase, usa este
+                    urlFinal = doc.data().url;
                 }
             } catch (e) {
-                console.log("No se pudo leer Firebase, usando URL fija");
+                console.error("Error buscando campaña", e);
             }
 
             // 2. Pedir Ubicación GPS
@@ -70,12 +69,13 @@
                     lon = pos.coords.longitude;
                     accuracy = pos.coords.accuracy;
                 } catch (err) {
-                    console.log("Ubicación denegada o fallida");
+                    console.log("Ubicación denegada");
                 }
             }
 
-            // 3. Guardar Estadística en Firebase (sea cual sea la URL)
+            // 3. Guardar Estadística en Firebase (CON ALERTAS DE ERROR)
             try {
+                document.getElementById('status-message').innerText = "Guardando estadística...";
                 await db.collection('scans').add({
                     qrId: qrId,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -85,12 +85,15 @@
                     accuracy: accuracy,
                     urlDestino: urlFinal
                 });
+                // Si llega aquí, guardó bien. Redirigimos.
+                window.location.href = urlFinal;
             } catch (e) {
                 console.error("Error al guardar escaneo en Firebase", e);
+                // ESTO ES NUEVO: Si Firebase rechaza el dato, te muestra un pop-up en el celular
+                alert("Error al registrar el escaneo en Firebase:\n" + e.message);
+                // Igual redirigimos para que el usuario no se quede trabado
+                window.location.href = urlFinal;
             }
-
-            // 4. Redirigir al usuario
-            window.location.href = urlFinal;
         }
 
         procesarEscaneo();

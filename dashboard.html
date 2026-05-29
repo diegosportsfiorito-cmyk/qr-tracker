@@ -172,19 +172,11 @@
             markersLayer = L.layerGroup().addTo(mapInstance);
         }
 
-        // --- TIEMPO REAL ARREGLADO (Sin OrderBy para evitar errores de Índice) ---
         function listenToScans() {
             db.collection('scans').onSnapshot(snapshot => {
                 allScans = [];
                 snapshot.forEach(doc => allScans.push(doc.data()));
-                
-                // Ordenar en JavaScript en lugar de Firebase
-                allScans.sort((a, b) => {
-                    const timeA = a.timestamp ? a.timestamp.seconds : 0;
-                    const timeB = b.timestamp ? b.timestamp.seconds : 0;
-                    return timeB - timeA; // Descendente
-                });
-
+                allScans.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                 document.getElementById('last-updated').innerText = `⏱ Tiempo real activo: ${new Date().toLocaleTimeString('es-AR')}`;
                 populateCampaignFilter();
                 applyLocalFilters();
@@ -194,7 +186,6 @@
             });
         }
 
-        // Botón Manual por si falla el tiempo real
         async function manualRefresh() {
             const snapshot = await db.collection('scans').get();
             allScans = [];
@@ -225,8 +216,11 @@
             const url = document.getElementById('new-camp-url').value.trim();
             if(!id || !url) return alert("Completa ambos campos");
             await db.collection('campaigns').doc(id).set({ url: url });
-            const qrLink = `https://diegosportsfiorito-cmyk.github.io/qr-tracker/redirect.html?id=${id}`;
-            prompt("✅ Campaña guardada! Copia este enlace para generar tu QR:", qrLink);
+            
+            // NUEVO ENLACE CORTO CON # (SOLUCIÓN 1)
+            const qrLink = `https://diegosportsfiorito-cmyk.github.io/qr-tracker/#${id}`;
+            prompt("✅ Campaña guardada! Copia este ENLACE CORTO para generar tu QR:", qrLink);
+            
             document.getElementById('new-camp-id').value = '';
             document.getElementById('new-camp-url').value = '';
         }

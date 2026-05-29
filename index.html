@@ -36,8 +36,9 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const qrId = urlParams.get('id') || 'desconocido';
+        // NUEVA FORMA DE LEER EL ID: Lee lo que está después del símbolo #
+        // Ejemplo: si la URL es .../qr-tracker/#whatsapp1, qrId será "whatsapp1"
+        const qrId = window.location.hash.substring(1) || 'desconocido';
 
         const destinosFijos = {
             "promo1": "https://google.com",
@@ -73,7 +74,7 @@
                 }
             }
 
-            // 3. Guardar Estadística en Firebase (CON ALERTAS DE ERROR)
+            // 3. Guardar Estadística en Firebase
             try {
                 document.getElementById('status-message').innerText = "Guardando estadística...";
                 await db.collection('scans').add({
@@ -85,13 +86,10 @@
                     accuracy: accuracy,
                     urlDestino: urlFinal
                 });
-                // Si llega aquí, guardó bien. Redirigimos.
                 window.location.href = urlFinal;
             } catch (e) {
                 console.error("Error al guardar escaneo en Firebase", e);
-                // ESTO ES NUEVO: Si Firebase rechaza el dato, te muestra un pop-up en el celular
-                alert("Error al registrar el escaneo en Firebase:\n" + e.message);
-                // Igual redirigimos para que el usuario no se quede trabado
+                alert("Error al registrar el escaneo:\n" + e.message);
                 window.location.href = urlFinal;
             }
         }

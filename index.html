@@ -6,20 +6,67 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
-        .message { text-align: center; padding: 20px; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f4f8; }
+        .message { text-align: center; padding: 30px; max-width: 400px; }
+        .spinner { border: 5px solid #e0e0e0; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .aviso-ubicacion { font-size: 0.85em; color: #555; margin-top: 15px; line-height: 1.4; max-width: 300px; margin-left: auto; margin-right: auto; }
+        
+        #status-message { font-size: 1.2em; color: #333; font-weight: 600; margin-bottom: 25px; }
+
+        /* NUEVO DISEÑO PARA EL AVISO DE UBICACIÓN */
+        .aviso-ubicacion {
+            background-color: #ffffff;
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            text-align: left;
+        }
+        .aviso-titulo {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2980b9;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .aviso-titulo span {
+            font-size: 1.5em;
+        }
+        .aviso-texto {
+            font-size: 1.1em;
+            color: #444;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        .aviso-destacado {
+            display: block;
+            background-color: #e8f6f3;
+            color: #16a085;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 1.1em;
+        }
     </style>
 </head>
 <body>
     <div class="message">
         <div class="spinner"></div>
-        <p id="status-message">Verificando enlace, por favor espere...</p>
+        <p id="status-message">Verificando enlace...</p>
+        
         <div class="aviso-ubicacion">
-            💡 <strong>¿Pronto te pediremos tu ubicación?</strong><br>
-            Autorízala para acceder a promociones y beneficios exclusivos disponibles en tu zona. ¡Es rápido y seguro!
+            <div class="aviso-titulo">
+                <span>📍</span> ¡No te pierdas nuestros beneficios!
+            </div>
+            <div class="aviso-texto">
+                Para acceder a promociones y descuentos exclusivos disponibles en tu zona, necesitamos saber tu ubicación.
+            </div>
+            <span class="aviso-destacado">
+                👉 Por favor, presiona <u>Permitir</u> cuando aparezca la alerta. ¡Es rápido y seguro!
+            </span>
         </div>
     </div>
 
@@ -36,8 +83,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // NUEVA FORMA DE LEER EL ID: Lee lo que está después del símbolo #
-        // Ejemplo: si la URL es .../qr-tracker/#whatsapp1, qrId será "whatsapp1"
         const qrId = window.location.hash.substring(1) || 'desconocido';
 
         const destinosFijos = {
@@ -49,7 +94,6 @@
         async function procesarEscaneo() {
             let urlFinal = destinosFijos[qrId] || "https://google.com";
 
-            // 1. Intentar buscar en Firebase
             try {
                 const doc = await db.collection('campaigns').doc(qrId).get();
                 if (doc.exists) {
@@ -59,12 +103,11 @@
                 console.error("Error buscando campaña", e);
             }
 
-            // 2. Pedir Ubicación GPS
             let lat = null, lon = null, accuracy = null;
             if (navigator.geolocation) {
                 try {
                     const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }); // Subí el timeout a 8 seg para que dé tiempo a leer
                     });
                     lat = pos.coords.latitude;
                     lon = pos.coords.longitude;
@@ -74,9 +117,8 @@
                 }
             }
 
-            // 3. Guardar Estadística en Firebase
             try {
-                document.getElementById('status-message').innerText = "Guardando estadística...";
+                document.getElementById('status-message').innerText = "Redirigiendo...";
                 await db.collection('scans').add({
                     qrId: qrId,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -89,7 +131,6 @@
                 window.location.href = urlFinal;
             } catch (e) {
                 console.error("Error al guardar escaneo en Firebase", e);
-                alert("Error al registrar el escaneo:\n" + e.message);
                 window.location.href = urlFinal;
             }
         }

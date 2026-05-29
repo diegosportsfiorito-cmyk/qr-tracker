@@ -12,7 +12,7 @@
     <!-- Librería para el Mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- NUEVA: Librería para generar QR -->
+    <!-- Librería para generar QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
@@ -60,12 +60,13 @@
         .login input { padding: 10px; font-size: 1em; width: 200px; }
         .login button { padding: 10px 20px; font-size: 1em; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 5px; }
 
-        /* NUEVO: Estilos para el Modal del QR */
+        /* Estilos para el Modal del QR */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .modal-content h2 { margin-top: 0; color: #27ae60; }
         #qrcode-container { margin: 20px auto; display: flex; justify-content: center; }
-        .modal-link { word-wrap: break-word; color: #3498db; margin-bottom: 20px; font-size: 0.9em; }
+        .modal-link { word-break: break-all; color: #3498db; margin-bottom: 20px; font-size: 0.9em; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
+        .modal-buttons { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -77,17 +78,20 @@
         <button onclick="checkPassword()">Entrar</button>
     </div>
 
-    <!-- NUEVO: Ventana Modal para mostrar el QR generado -->
+    <!-- Ventana Modal para mostrar el QR generado -->
     <div id="qr-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>✅ ¡Código QR Generado!</h2>
             <p>Escanea este código o descárgalo para imprimirlo:</p>
             <div id="qrcode-container"></div>
             <div class="modal-link">
-                Enlace: <span id="modal-link-text"></span>
+                <span id="modal-link-text"></span>
             </div>
-            <button class="btn btn-purple" onclick="downloadQR()">📥 Descargar QR</button>
-            <button class="btn btn-blue" onclick="closeModal()" style="margin-left: 10px;">Cerrar</button>
+            <div class="modal-buttons">
+                <button class="btn btn-green" onclick="copyLink()">📋 Copiar Enlace</button>
+                <button class="btn btn-purple" onclick="downloadQR()">📥 Descargar QR</button>
+                <button class="btn btn-blue" onclick="closeModal()">Cerrar</button>
+            </div>
         </div>
     </div>
 
@@ -179,7 +183,7 @@
         let allScans = [];
         let mapInstance = null;
         let markersLayer = null;
-        let qrCodeInstance = null; // Variable para el QR
+        let qrCodeInstance = null;
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/qr-tracker/sw.js').catch(err => console.log('SW Error', err));
@@ -252,13 +256,10 @@
             
             const qrLink = `https://diegosportsfiorito-cmyk.github.io/qr-tracker/#${id}`;
             
-            // NUEVA LÓGICA: Mostrar modal con QR en lugar de prompt()
             document.getElementById('modal-link-text').innerText = qrLink;
             
             const container = document.getElementById('qrcode-container');
-            container.innerHTML = ''; // Limpiar QR anterior si existe
-            
-            // Generar la imagen del QR
+            container.innerHTML = ''; 
             qrCodeInstance = new QRCode(container, {
                 text: qrLink,
                 width: 200,
@@ -268,9 +269,7 @@
                 correctLevel : QRCode.CorrectLevel.H
             });
             
-            // Mostrar el modal
             document.getElementById('qr-modal').style.display = 'flex';
-            
             document.getElementById('new-camp-id').value = '';
             document.getElementById('new-camp-url').value = '';
         }
@@ -279,7 +278,6 @@
             document.getElementById('qr-modal').style.display = 'none';
         }
 
-        // NUEVA FUNCIÓN: Descargar la imagen del QR
         function downloadQR() {
             const canvas = document.querySelector('#qrcode-container canvas');
             if (canvas) {
@@ -290,6 +288,22 @@
             } else {
                 alert("El QR aún se está generando, espera un segundo.");
             }
+        }
+
+        function copyLink() {
+            const linkText = document.getElementById('modal-link-text').innerText;
+            navigator.clipboard.writeText(linkText).then(() => {
+                alert("✅ Enlace copiado al portapapeles!");
+            }).catch(err => {
+                // Método alternativo por si el navegador bloquea el portapapeles
+                const textArea = document.createElement("textarea");
+                textArea.value = linkText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert("✅ Enlace copiado al portapapeles!");
+            });
         }
 
         async function deleteCampaign(id) {

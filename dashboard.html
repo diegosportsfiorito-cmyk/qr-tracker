@@ -8,7 +8,6 @@
     <meta name="theme-color" content="#3498db">
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <!-- Cargar Chart.js primero -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -39,7 +38,6 @@
         #map { height: 300px; width: 100%; border-radius: 8px; z-index: 1; }
         .campaign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9f9f9; margin-bottom: 5px; border-radius: 5px; font-size: 0.9em; border-left: 4px solid #3498db; }
 
-        /* CORRECCIÓN CRUCIAL PARA CHART.JS: Altura fija y posición relativa */
         .charts-grid { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
         .chart-card { 
             flex: 1; 
@@ -49,8 +47,8 @@
             border-radius: 8px; 
             border: 1px solid #eee; 
             box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
-            position: relative; /* Necesario para Chart.js */
-            height: 350px; /* Altura forzada para que no colapse a 0 */
+            position: relative; 
+            height: 350px; 
         }
         .chart-card h3 { margin-top: 0; color: #2c3e50; font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 10px; }
 
@@ -232,9 +230,14 @@
         }
 
         function initMap() {
-            mapInstance = L.map('map').setView([-34.6, -58.4], 4);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
-            markersLayer = L.featureGroup().addTo(mapInstance);
+            try {
+                mapInstance = L.map('map').setView([-34.6, -58.4], 4);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
+                // CORRECCIÓN: Usar featureGroup que SÍ tiene getBounds()
+                markersLayer = L.featureGroup().addTo(mapInstance);
+            } catch (e) {
+                console.error("Error inicializando mapa:", e);
+            }
         }
 
         function listenToScans() {
@@ -343,7 +346,9 @@
             const tabla = document.getElementById('tabla-datos');
             tabla.innerHTML = '';
             let countLoc = 0, accSum = 0, accCount = 0;
-            markersLayer.clearLayers();
+            
+            // Limpiar mapa de forma segura
+            try { if(markersLayer) markersLayer.clearLayers(); } catch(e) {}
 
             data.forEach(data => {
                 let fechaStr = 'Sin fecha';
@@ -360,8 +365,14 @@
                     countLoc++;
                     if(data.accuracy) { accSum += data.accuracy; accCount++; }
                     ubicacionHTML = `<a class="btn-map" href="https://www.google.com/maps?q=${data.lat},${data.lon}" target="_blank">📍 Mapa (~${Math.round(data.accuracy || 0)}m)</a>`;
-                    const marker = L.marker([data.lat, data.lon]).bindPopup(`<b>${data.qrId}</b><br>${fechaStr}<br>${dispositivo}`);
-                    markersLayer.addLayer(marker);
+                    
+                    // Agregar marcador de forma segura
+                    try {
+                        if(markersLayer) {
+                            const marker = L.marker([data.lat, data.lon]).bindPopup(`<b>${data.qrId}</b><br>${fechaStr}<br>${dispositivo}`);
+                            markersLayer.addLayer(marker);
+                        }
+                    } catch(e) {}
                 }
                 tabla.innerHTML += `<tr><td>${fechaStr}</td><td><strong>${data.qrId || 'N/A'}</strong></td><td>${dispositivo}</td><td>${ubicacionHTML}</td></tr>`;
             });
@@ -370,23 +381,29 @@
             document.getElementById('total-with-location').innerText = countLoc;
             document.getElementById('avg-accuracy').innerText = accCount > 0 ? Math.round(accSum / accCount) : '--';
 
-            if(markersLayer.getLayers().length > 0) { mapInstance.fitBounds(markersLayer.getBounds().pad(0.2)); }
+            // Ajustar mapa de forma segura (Si esto falla, NO frena los gráficos)
+            try {
+                if(markersLayer && markersLayer.getLayers().length > 0) {
+                    mapInstance.fitBounds(markersLayer.getBounds().pad(0.2));
+                }
+            } catch (e) {
+                console.error("Error ajustando el mapa, pero los gráficos deberían funcionar:", e);
+            }
             
+            // RENDERIZAR GRÁFICOS (Pase lo que pase arriba, esto se ejecutará)
             renderCharts(data);
         }
 
         function renderCharts(data) {
             try {
-                // Verificar si Chart.js cargó
                 if (typeof Chart === 'undefined') {
-                    console.error("Chart.js no está cargado. Revisa tu conexión o bloqueadores de anuncios.");
+                    console.error("Chart.js no está cargado.");
                     return;
                 }
 
                 if(chartCampaigns) chartCampaigns.destroy();
                 if(chartTimeline) chartTimeline.destroy();
 
-                // 1. Gráfico de Campañas (Barras)
                 const campaignsCount = {};
                 data.forEach(d => {
                     const id = d.qrId || 'N/A';
@@ -407,13 +424,12 @@
                     },
                     options: { 
                         responsive: true, 
-                        maintainAspectRatio: false, // FORZAR al contenedor
+                        maintainAspectRatio: false, 
                         scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
                         plugins: { legend: { display: false } } 
                     }
                 });
 
-                // 2. Gráfico de Línea Temporal (Día)
                 const timelineCount = {};
                 data.forEach(d => {
                     if(d.timestamp) {
@@ -442,15 +458,14 @@
                     },
                     options: { 
                         responsive: true, 
-                        maintainAspectRatio: false, // FORZAR al contenedor
+                        maintainAspectRatio: false, 
                         scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, 
                         plugins: { legend: { display: false } } 
                     }
                 });
 
             } catch (error) {
-                console.error("Error dibujando gráficos:", error);
-                // Si hay un error, lo mostramos para saber qué falla
+                console.error("Error crítico dibujando gráficos:", error);
             }
         }
 

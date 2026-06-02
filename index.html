@@ -6,50 +6,28 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f4f8; }
-        .message { text-align: center; padding: 30px; max-width: 400px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f4f8; }
+        .message { text-align: center; padding: 30px; max-width: 400px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
         .spinner { border: 5px solid #e0e0e0; border-top: 5px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
         #status-message { font-size: 1.2em; color: #333; font-weight: 600; margin-bottom: 25px; }
 
-        /* NUEVO DISEÑO PARA EL AVISO DE UBICACIÓN */
         .aviso-ubicacion {
-            background-color: #ffffff;
-            border: 2px solid #3498db;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            text-align: left;
+            background-color: #ffffff; border: 2px solid #3498db; border-radius: 12px;
+            padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: left;
         }
-        .aviso-titulo {
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #2980b9;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .aviso-titulo { font-size: 1.3em; font-weight: bold; color: #2980b9; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+        .aviso-texto { font-size: 1.1em; color: #444; line-height: 1.5; margin-bottom: 15px; }
+        .aviso-destacado { display: block; background-color: #e8f6f3; color: #16a085; font-weight: bold; padding: 10px; border-radius: 6px; text-align: center; font-size: 1.1em; }
+
+        /* NUEVO: Estilo del Footer */
+        .footer {
+            width: 100%; text-align: center; padding: 15px; font-size: 0.85em; color: #7f8c8d;
+            background: #e9ecef; border-top: 1px solid #dee2e6;
         }
-        .aviso-titulo span {
-            font-size: 1.5em;
-        }
-        .aviso-texto {
-            font-size: 1.1em;
-            color: #444;
-            line-height: 1.5;
-            margin-bottom: 15px;
-        }
-        .aviso-destacado {
-            display: block;
-            background-color: #e8f6f3;
-            color: #16a085;
-            font-weight: bold;
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
-            font-size: 1.1em;
-        }
+        .footer strong { color: #34495e; }
+        .footer svg { vertical-align: middle; margin-right: 5px; fill: #3498db; }
     </style>
 </head>
 <body>
@@ -68,6 +46,14 @@
                 👉 Por favor, presiona <u>Permitir</u> cuando aparezca la alerta. ¡Es rápido y seguro!
             </span>
         </div>
+    </div>
+
+    <!-- NUEVO: Footer con Isotipo -->
+    <div class="footer">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+            <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM17 17h4v4h-4zM14 14h3v3h-3z"/>
+        </svg>
+        Aplicación desarrollada por <strong>Estudio SALAS CREATIVE LAB</strong>
     </div>
 
     <script>
@@ -91,6 +77,48 @@
             "whatsapp1": "https://wa.link/sr53o3"
         };
 
+        // NUEVA LÓGICA: Forzar GPS de alta precisión esperando a que despierte
+        async function getHighAccuracyLocation() {
+            if (!navigator.geolocation) return null;
+
+            return new Promise((resolve) => {
+                let bestPosition = null;
+                let resolved = false;
+
+                // watchPosition se ejecuta cada vez que el GPS encuentra una señal mejor
+                const watchId = navigator.geolocation.watchPosition(
+                    (pos) => {
+                        if (!bestPosition || pos.coords.accuracy < bestPosition.coords.accuracy) {
+                            bestPosition = pos;
+                        }
+                        // Si logra una precisión menor a 100 metros (GPS real encendido), la usamos de inmediato
+                        if (bestPosition && bestPosition.coords.accuracy <= 100 && !resolved) {
+                            resolved = true;
+                            navigator.geolocation.clearWatch(watchId);
+                            resolve(bestPosition);
+                        }
+                    },
+                    (error) => {
+                        if (!resolved) {
+                            resolved = true;
+                            navigator.geolocation.clearWatch(watchId);
+                            resolve(bestPosition); // Si hay error, devolvemos lo que tengamos
+                        }
+                    },
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
+
+                // Límite de tiempo: Si después de 10 segundos no logramos alta precisión, usamos la mejor que haya
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        navigator.geolocation.clearWatch(watchId);
+                        resolve(bestPosition);
+                    }
+                }, 10000);
+            });
+        }
+
         async function procesarEscaneo() {
             let urlFinal = destinosFijos[qrId] || "https://google.com";
 
@@ -104,21 +132,18 @@
             }
 
             let lat = null, lon = null, accuracy = null;
-            if (navigator.geolocation) {
-                try {
-                    const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); // Subí el timeout a 15 seg para que dé tiempo a leer
-                    });
-                    lat = pos.coords.latitude;
-                    lon = pos.coords.longitude;
-                    accuracy = pos.coords.accuracy;
-                } catch (err) {
-                    console.log("Ubicación denegada");
-                }
+            
+            document.getElementById('status-message').innerText = "Obteniendo ubicación...";
+            const pos = await getHighAccuracyLocation();
+
+            if (pos) {
+                lat = pos.coords.latitude;
+                lon = pos.coords.longitude;
+                accuracy = pos.coords.accuracy;
             }
 
             try {
-                document.getElementById('status-message').innerText = "Redirigiendo...";
+                document.getElementById('status-message').innerText = "Guardando estadística...";
                 await db.collection('scans').add({
                     qrId: qrId,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),

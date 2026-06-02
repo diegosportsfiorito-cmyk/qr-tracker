@@ -241,7 +241,6 @@
 
         if (localStorage.getItem('darkMode') === 'true') {
             document.body.classList.add('dark-mode');
-            // Marcar el toggle al cargar
             window.onload = () => { if(document.getElementById('dark-mode-toggle')) document.getElementById('dark-mode-toggle').checked = true; };
         }
 
@@ -464,45 +463,30 @@
         }
 
         async function exportToPDF() {
-            alert("Preparando informe PDF. Esto puede tardar unos segundos...");
+            alert("Generando PDF, por favor espera unos segundos...");
 
             const element = document.getElementById('pdf-content');
             
-            // 1. Forzar modo claro para el PDF
+            // 1. Forzar modo claro para el PDF (para no gastar tinta)
             const isDarkMode = document.body.classList.contains('dark-mode');
             if (isDarkMode) document.body.classList.remove('dark-mode');
 
-            // 2. Ocultar elementos interactivos
-            const interactiveElements = element.querySelectorAll('.top-bar, .form-group, .campaign-actions, .filters, .btn, .switch');
-            interactiveElements.forEach(el => el.style.display = 'none');
+            // 2. Ocultar SOLO los elementos interactivos usando visibility:hidden (mantiene el espacio)
+            const interactiveElements = element.querySelectorAll('.top-bar, .form-group, .campaign-actions, .filters, .switch');
+            interactiveElements.forEach(el => el.style.visibility = 'hidden');
 
-            // 3. SOLUCIÓN DE CORTE: Quitar alturas fijas a los gráficos para que fluyan
-            const chartCards = element.querySelectorAll('.chart-card');
-            const originalHeights = [];
-            chartCards.forEach(card => {
-                originalHeights.push(card.style.height);
-                card.style.height = 'auto'; // Altura automática para el PDF
-            });
-
-            // 4. Convertir gráficos a imágenes estáticas
-            const chartCanvases = element.querySelectorAll('canvas');
-            const originalCanvases = [];
-            chartCanvases.forEach(canvas => {
-                const img = document.createElement('img');
-                img.src = canvas.toDataURL('image/png');
-                img.style.width = '100%';
-                img.style.height = 'auto';
-                img.style.marginBottom = '20px'; 
-                originalCanvases.push({ canvas, img, parent: canvas.parentNode });
-                canvas.parentNode.replaceChild(img, canvas);
-            });
-
-            // 5. Configuración del PDF
+            // 3. Configuración del PDF
             const opt = {
-                margin:       0.5,
+                margin:       [0.5, 0.3, 0.5, 0.3], // Márgenes: arriba, derecha, abajo, izquierda
                 filename:     'Informe_QR_Tracker.pdf',
-                image:        { type: 'jpeg', quality: 0.95 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: element.scrollWidth },
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { 
+                    scale: 2, 
+                    useCORS: true, 
+                    logging: false, 
+                    scrollY: 0,
+                    allowTaint: true // Ayuda a renderizar gráficos externos
+                },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
                 pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
@@ -514,10 +498,8 @@
                 alert("Hubo un error al generar el PDF.");
             }
 
-            // 6. RESTAURAR TODO
-            chartCards.forEach((card, index) => { card.style.height = originalHeights[index]; });
-            originalCanvases.forEach(item => { item.parent.replaceChild(item.canvas, item.img); });
-            interactiveElements.forEach(el => el.style.display = '');
+            // 4. RESTAURAR TODO
+            interactiveElements.forEach(el => el.style.visibility = 'visible');
             if (isDarkMode) document.body.classList.add('dark-mode');
         }
 

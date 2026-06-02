@@ -9,17 +9,13 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Librería para el Mapa -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Librería para generar QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h1, h2 { color: #333; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-        
-        /* Stats y Top Bar */
         .stats { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
         .stat-box { background: #3498db; color: white; padding: 15px; border-radius: 8px; text-align: center; flex: 1; min-width: 120px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .stat-box.orange { background: #e67e22; }
@@ -33,8 +29,8 @@
         .btn-green { background: #2ecc71; } .btn-green:hover { background: #27ae60; }
         .btn-purple { background: #9b59b6; } .btn-purple:hover { background: #8e44ad; }
         .btn-red { background: #e74c3c; font-size: 0.8em; padding: 5px 10px; } .btn-red:hover { background: #c0392b; }
-
-        /* Sección Campañas y Mapa */
+        
+        /* Grid para Mapa y Campañas */
         .grid-section { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
         .card { flex: 1; min-width: 300px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
         .form-group { margin-bottom: 10px; }
@@ -43,7 +39,11 @@
         #map { height: 300px; width: 100%; border-radius: 8px; z-index: 1; }
         .campaign-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f9f9f9; margin-bottom: 5px; border-radius: 5px; font-size: 0.9em; border-left: 4px solid #3498db; }
 
-        /* Tabla y Filtros */
+        /* NUEVO: Grid para Gráficos */
+        .charts-grid { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .chart-card { flex: 1; min-width: 300px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .chart-card h3 { margin-top: 0; color: #2c3e50; font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
         .filters { display: flex; gap: 15px; margin-bottom: 20px; padding: 15px; background: #fdfdfd; border: 1px solid #ddd; border-radius: 8px; flex-wrap: wrap; align-items: flex-end; }
         .filter-group label { font-weight: bold; font-size: 0.85em; color: #333; display: block; margin-bottom: 5px; }
         .filter-group select, .filter-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
@@ -60,7 +60,6 @@
         .login input { padding: 10px; font-size: 1em; width: 200px; }
         .login button { padding: 10px 20px; font-size: 1em; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 5px; }
 
-        /* Estilos para el Modal del QR */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 30px; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .modal-content h2 { margin-top: 0; color: #27ae60; }
@@ -68,23 +67,9 @@
         .modal-link { word-break: break-all; color: #3498db; margin-bottom: 20px; font-size: 0.9em; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
         .modal-buttons { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 
-        /* NUEVO: Estilo del Footer Minimalista */
-        .footer {
-            text-align: center; 
-            padding: 30px 0 10px 0; 
-            font-size: 0.8em; 
-            color: #bdc3c7; /* Color muy suave */
-            letter-spacing: 0.5px;
-        }
-        .footer strong { 
-            color: #95a5a6; /* Un poco más oscuro para destacar */ 
-            font-weight: 600; 
-        }
-        .footer svg { 
-            vertical-align: middle; 
-            margin-right: 6px; 
-            fill: #bdc3c7; /* Mismo tono suave */
-        }
+        .footer { text-align: center; padding: 30px 0 10px 0; font-size: 0.8em; color: #bdc3c7; letter-spacing: 0.5px; }
+        .footer strong { color: #95a5a6; font-weight: 600; }
+        .footer svg { vertical-align: middle; margin-right: 6px; fill: #bdc3c7; }
     </style>
 </head>
 <body>
@@ -96,15 +81,12 @@
         <button onclick="checkPassword()">Entrar</button>
     </div>
 
-    <!-- Ventana Modal para mostrar el QR generado -->
     <div id="qr-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>✅ ¡Código QR Generado!</h2>
             <p>Escanea este código o descárgalo para imprimirlo:</p>
             <div id="qrcode-container"></div>
-            <div class="modal-link">
-                <span id="modal-link-text"></span>
-            </div>
+            <div class="modal-link"><span id="modal-link-text"></span></div>
             <div class="modal-buttons">
                 <button class="btn btn-green" onclick="copyLink()">📋 Copiar Enlace</button>
                 <button class="btn btn-purple" onclick="downloadQR()">📥 Descargar QR</button>
@@ -120,7 +102,7 @@
             <div class="stats">
                 <div class="stat-box"><h2 id="total-scans">0</h2><p>Total Escaneos</p></div>
                 <div class="stat-box orange"><h2 id="total-with-location">0</h2><p>Con Ubicación</p></div>
-                <div class="stat-box green"><h2 id="avg-accuracy">--</h2><p>Precisión (m)</p></div>
+                <div class="stat-box green"><h2 id="avg-accuracy">--</h2><p>Precisión GPS (m)</p></div>
             </div>
 
             <div class="top-bar">
@@ -128,6 +110,18 @@
                 <div>
                     <button class="btn btn-green" onclick="manualRefresh()">🔄 Actualizar</button>
                     <button class="btn btn-purple" onclick="exportToCSV()">📥 CSV</button>
+                </div>
+            </div>
+
+            <!-- NUEVO: Sección de Gráficos -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>📊 Escaneos por Campaña</h3>
+                    <canvas id="chartCampaigns"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>📈 Tendencia Temporal (Día)</h3>
+                    <canvas id="chartTimeline"></canvas>
                 </div>
             </div>
 
@@ -184,15 +178,10 @@
                 <tbody id="tabla-datos"></tbody>
             </table>
 
-            <!-- NUEVO: Footer Minimalista -->
             <div class="footer">
-                <svg width="16" height="16" viewBox="0 0 24 24">
-                    <!-- Isotipo: Diamante/Rombo minimalista que representa precisión/creatividad -->
-                    <path d="M12 2L2 12l10 10 10-10L12 2zm0 2.83L19.17 12 12 19.17 4.83 12 12 4.83z"/>
-                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 2.83L19.17 12 12 19.17 4.83 12 12 4.83z"/></svg>
                 Aplicación desarrollada por <strong>Estudio SALAS CREATIVE LAB</strong>
             </div>
-
         </div>
     </div>
 
@@ -212,6 +201,10 @@
         let mapInstance = null;
         let markersLayer = null;
         let qrCodeInstance = null;
+        
+        // Variables para los gráficos
+        let chartCampaigns = null;
+        let chartTimeline = null;
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/qr-tracker/sw.js').catch(err => console.log('SW Error', err));
@@ -283,60 +276,33 @@
             await db.collection('campaigns').doc(id).set({ url: url });
             
             const qrLink = `https://diegosportsfiorito-cmyk.github.io/qr-tracker/#${id}`;
-            
             document.getElementById('modal-link-text').innerText = qrLink;
-            
             const container = document.getElementById('qrcode-container');
             container.innerHTML = ''; 
-            qrCodeInstance = new QRCode(container, {
-                text: qrLink,
-                width: 200,
-                height: 200,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-            
+            qrCodeInstance = new QRCode(container, { text: qrLink, width: 200, height: 200, correctLevel : QRCode.CorrectLevel.H });
             document.getElementById('qr-modal').style.display = 'flex';
             document.getElementById('new-camp-id').value = '';
             document.getElementById('new-camp-url').value = '';
         }
 
-        function closeModal() {
-            document.getElementById('qr-modal').style.display = 'none';
-        }
+        function closeModal() { document.getElementById('qr-modal').style.display = 'none'; }
 
         function downloadQR() {
             const canvas = document.querySelector('#qrcode-container canvas');
             if (canvas) {
-                const link = document.createElement('a');
-                link.download = 'codigo_qr.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            } else {
-                alert("El QR aún se está generando, espera un segundo.");
-            }
+                const link = document.createElement('a'); link.download = 'codigo_qr.png'; link.href = canvas.toDataURL('image/png'); link.click();
+            } else { alert("El QR aún se está generando, espera un segundo."); }
         }
 
         function copyLink() {
             const linkText = document.getElementById('modal-link-text').innerText;
-            navigator.clipboard.writeText(linkText).then(() => {
-                alert("✅ Enlace copiado al portapapeles!");
-            }).catch(err => {
-                const textArea = document.createElement("textarea");
-                textArea.value = linkText;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                alert("✅ Enlace copiado al portapapeles!");
+            navigator.clipboard.writeText(linkText).then(() => { alert("✅ Enlace copiado!"); }).catch(err => {
+                const textArea = document.createElement("textarea"); textArea.value = linkText; document.body.appendChild(textArea); textArea.select(); document.execCommand('copy'); document.body.removeChild(textArea); alert("✅ Enlace copiado!");
             });
         }
 
         async function deleteCampaign(id) {
-            if(confirm(`¿Seguro que quieres borrar la campaña ${id}?`)) {
-                await db.collection('campaigns').doc(id).delete();
-            }
+            if(confirm(`¿Seguro que quieres borrar la campaña ${id}?`)) { await db.collection('campaigns').doc(id).delete(); }
         }
 
         function populateCampaignFilter() {
@@ -398,9 +364,73 @@
             document.getElementById('total-with-location').innerText = countLoc;
             document.getElementById('avg-accuracy').innerText = accCount > 0 ? Math.round(accSum / accCount) : '--';
 
-            if(markersLayer.getLayers().length > 0) {
-                mapInstance.fitBounds(markersLayer.getBounds().pad(0.2));
-            }
+            if(markersLayer.getLayers().length > 0) { mapInstance.fitBounds(markersLayer.getBounds().pad(0.2)); }
+            
+            // NUEVO: Renderizar gráficos con los datos filtrados
+            renderCharts(data);
+        }
+
+        // NUEVA FUNCIÓN: Lógica de Gráficos con Chart.js
+        function renderCharts(data) {
+            // 1. Destruir gráficos anteriores si existen para evitar superposición
+            if(chartCampaigns) chartCampaigns.destroy();
+            if(chartTimeline) chartTimeline.destroy();
+
+            // 2. Gráfico de Campañas (Barras)
+            const campaignsCount = {};
+            data.forEach(d => {
+                const id = d.qrId || 'N/A';
+                campaignsCount[id] = (campaignsCount[id] || 0) + 1;
+            });
+
+            const ctxCampaigns = document.getElementById('chartCampaigns').getContext('2d');
+            chartCampaigns = new Chart(ctxCampaigns, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(campaignsCount),
+                    datasets: [{
+                        label: 'Escaneos',
+                        data: Object.values(campaignsCount),
+                        backgroundColor: '#3498db',
+                        borderRadius: 4
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+            });
+
+            // 3. Gráfico de Línea Temporal (Día)
+            const timelineCount = {};
+            data.forEach(d => {
+                if(d.timestamp) {
+                    const day = new Date(d.timestamp.seconds * 1000).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+                    timelineCount[day] = (timelineCount[day] || 0) + 1;
+                }
+            });
+
+            // Ordenar las fechas
+            const sortedDays = Object.keys(timelineCount).sort((a, b) => {
+                const partsA = a.split('/'); const partsB = b.split('/');
+                return new Date('20'+partsA[2], partsA[1]-1, partsA[0]) - new Date('20'+partsB[2], partsB[1]-1, partsB[0]);
+            });
+
+            const ctxTimeline = document.getElementById('chartTimeline').getContext('2d');
+            chartTimeline = new Chart(ctxTimeline, {
+                type: 'line',
+                data: {
+                    labels: sortedDays,
+                    datasets: [{
+                        label: 'Escaneos por día',
+                        data: sortedDays.map(day => timelineCount[day]),
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.2)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#27ae60'
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+            });
         }
 
         function exportToCSV() {
@@ -411,10 +441,7 @@
                 let disp = d.userAgent && d.userAgent.includes('Android') ? 'Android' : d.userAgent && d.userAgent.includes('iPhone') ? 'iOS' : 'Otro';
                 csv += `${fecha},${d.qrId},${disp},${d.lat},${d.lon},${d.accuracy ? Math.round(d.accuracy) : ''}\n`;
             });
-            const link = document.createElement("a");
-            link.setAttribute("href", encodeURI(csv));
-            link.setAttribute("download", "reporte_qr.csv");
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csv)); link.setAttribute("download", "reporte_qr.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
     </script>
 </body>

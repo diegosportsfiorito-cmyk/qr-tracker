@@ -234,7 +234,7 @@
         function initMap() {
             mapInstance = L.map('map').setView([-34.6, -58.4], 4);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapInstance);
-            markersLayer = L.layerGroup().addTo(mapInstance);
+            markersLayer = L.featureGroup().addTo(mapInstance);
         }
 
         function listenToScans() {

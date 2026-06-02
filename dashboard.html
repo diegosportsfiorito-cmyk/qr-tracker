@@ -67,6 +67,24 @@
         #qrcode-container { margin: 20px auto; display: flex; justify-content: center; }
         .modal-link { word-break: break-all; color: #3498db; margin-bottom: 20px; font-size: 0.9em; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee; }
         .modal-buttons { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+        /* NUEVO: Estilo del Footer Minimalista */
+        .footer {
+            text-align: center; 
+            padding: 30px 0 10px 0; 
+            font-size: 0.8em; 
+            color: #bdc3c7; /* Color muy suave */
+            letter-spacing: 0.5px;
+        }
+        .footer strong { 
+            color: #95a5a6; /* Un poco más oscuro para destacar */ 
+            font-weight: 600; 
+        }
+        .footer svg { 
+            vertical-align: middle; 
+            margin-right: 6px; 
+            fill: #bdc3c7; /* Mismo tono suave */
+        }
     </style>
 </head>
 <body>
@@ -165,6 +183,16 @@
                 </thead>
                 <tbody id="tabla-datos"></tbody>
             </table>
+
+            <!-- NUEVO: Footer Minimalista -->
+            <div class="footer">
+                <svg width="16" height="16" viewBox="0 0 24 24">
+                    <!-- Isotipo: Diamante/Rombo minimalista que representa precisión/creatividad -->
+                    <path d="M12 2L2 12l10 10 10-10L12 2zm0 2.83L19.17 12 12 19.17 4.83 12 12 4.83z"/>
+                </svg>
+                Aplicación desarrollada por <strong>Estudio SALAS CREATIVE LAB</strong>
+            </div>
+
         </div>
     </div>
 
@@ -295,7 +323,6 @@
             navigator.clipboard.writeText(linkText).then(() => {
                 alert("✅ Enlace copiado al portapapeles!");
             }).catch(err => {
-                // Método alternativo por si el navegador bloquea el portapapeles
                 const textArea = document.createElement("textarea");
                 textArea.value = linkText;
                 document.body.appendChild(textArea);
